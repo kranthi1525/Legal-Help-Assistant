@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ask Your Legal Question - Legal Help Assistant</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+    
+    // Firebase config - replace with your actual config
+      const firebaseConfig = {
+        apiKey: "AIzaSyBcrz46jksX5pHwDRqKdgPhIXprp0oM8SQ",
+        authDomain: "kranthigdgproject.firebaseapp.com",
+        projectId: "kranthigdgproject",
+        storageBucket: "kranthigdgproject.firebasestorage.app",
+        messagingSenderId: "258164974808",
+        appId: "1:258164974808:web:086705b2a3b1f0638063ad",
+        measurementId: "G-S94LDVXC6F"
+      };
+
+    
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    
+    // Gemini API key - replace with your actual key
+    const GEMINI_API_KEY = 'AIzaSyAcA21Z0ioJFHuatKCBGEJwF6lEV7k4KFw';
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    
+    let currentUser = null;
+    
+    // Check authentication
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        updateNavForLoggedInUser(user);
+      } else {
+        // Not logged in, redirect to login
+        window.location.href = 'login.html';
+      }
+    });
+    
+    function updateNavForLoggedInUser(user) {
+      const loginLink = document.querySelector('a[href="login.html"]');
+      if (loginLink) {
+        loginLink.textContent = user.displayName || 'Profile';
+        loginLink.href = '#';
+        loginLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (confirm('Do you want to sign out?')) {
+            signOut(auth);
+          }
+        });
+      }
+    }
+    
+    // Ask Gemini API
+    async function askGemini(question) {
+      const systemPrompt = "You are a helpful legal rights assistant trained in Indian law. Respond in plain language for students and freelancers. Mention if a lawyer should be consulted.";
+      
+      const requestBody = {
+        contents: [{
+          parts: [{
+            text: `${systemPrompt}\n\nUser question: ${question}`
+          }]
+        }]
+      };
+      
+      try {
+        const response = await fetch(GEMINI_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+        
+      } catch (error) {
+        console.error('Gemini API error:', error);
+        throw new Error('Failed to get response from AI. Please try again.');
+      }
+    }
+    
+    // Save to Firestore
+    async function saveQuestionToFirestore(question, answer) {
+      if (!currentUser) return;
+      
+      try {
+        const docRef = await addDoc(collection(db, 'users', currentUser.uid, 'questions'), {
+          question: question,
+          answer: answer,
+          timestamp: serverTimestamp(),
+          userId: currentUser.uid
+        });
+        
+        console.log('Question saved with ID: ', docRef.id);
+        return docRef.id;
+        
+      } catch (error) {
+        console.error('Error saving to Firestore:', error);
+        throw new Error('Failed to save question. Please try again.');
+      }
+    }
+    
+    // Question form handling
+    document.addEventListener('DOMContentLoaded', function() {
+      const questionForm = document.getElementById('questionForm');
+      
+      questionForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const questionInput = document.getElementById('questionInput');
+        const submitButton = document.querySelector('.submit-button');
+        const responseContainer = document.getElementById('responseContainer');
+        const responseArea = document.getElementById('responseArea');
+        
+        const question = questionInput.value.trim();
+        
+        if (!question) {
+          showNotification('Please enter your legal question.', 'error');
+          return;
+        }
+        
+        if (!currentUser) {
+          showNotification('Please log in to ask questions.', 'error');
+          return;
+        }
+        
+        // Show loading state
+        const originalContent = submitButton.innerHTML;
+        submitButton.innerHTML = '<span class="loading-spinner"></span> Getting AI Response...';
+        submitButton.disabled = true;
+        
+        try {
+          // Get response from Gemini
+          const aiResponse = await askGemini(question);
+          
+          // Display response
+          responseArea.innerHTML = `
+            <div class="legal-response">
+              <h4>Legal Guidance</h4>
+              <p><strong>Your question:</strong> "${question}"</p>
+              <div class="response-content">
+                ${aiResponse.replace(/\n/g, '<br>')}
+              </div>
+              <div class="disclaimer">
+                <p><em>⚠️ This is AI-generated legal information based on Indian law and not professional legal advice. For specific legal matters, please consult with a qualified attorney.</em></p>
+              </div>
+            </div>
+          `;
+          
+          responseContainer.classList.remove('hidden');
+          
+          // Save to Firestore
+          await saveQuestionToFirestore(question, aiResponse);
+          
+          // Reset form
+          questionInput.value = '';
+          
+          // Scroll to response
+          responseContainer.scrollIntoView({ behavior: 'smooth' });
+          
+          showNotification('Legal guidance generated and saved successfully!');
+          
+        } catch (error) {
+          console.error('Error:', error);
+          showNotification(error.message, 'error');
+          
+        } finally {
+          // Hide loading state
+          submitButton.innerHTML = originalContent;
+          submitButton.disabled = false;
+        }
+      });
+    });
+  </script>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-container">
+        <a href="index.html" class="logo">Legal Help Assistant</a>
+        <ul class="nav-menu">
+          <li><a href="index.html" class="nav-link">Home</a></li>
+          <li><a href="ask.html" class="nav-link">Ask a Question</a></li>
+          <li><a href="documents.html" class="nav-link">Documents</a></li>
+          <li><a href="saved.html" class="nav-link">Saved</a></li>
+          <li><a href="login.html" class="nav-link">Login</a></li>
+        </ul>
+        <button class="mobile-menu-toggle">☰</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="container">
+      <div class="question-page">
+        <div class="page-header text-center mb-4">
+          <h1>Ask Your Legal Question</h1>
+          <p>Get instant AI-powered legal guidance tailored to your situation</p>
+        </div>
+
+        <!-- Question Form -->
+        <div class="question-form-container card">
+          <form class="question-form" id="questionForm">
+            <div class="form-group">
+              <label for="questionInput" class="form-label">What's your legal question?</label>
+              <textarea 
+                id="questionInput" 
+                class="form-textarea input-box" 
+                placeholder="Describe your legal question in detail. For example: 'I'm a freelancer and my client hasn't paid me for work completed 3 months ago. What are my options?'"
+                rows="6"
+                required
+              ></textarea>
+            </div>
+            
+            <div class="form-group">
+              <label for="categorySelect" class="form-label">Question Category (Optional)</label>
+              <select id="categorySelect" class="form-select">
+                <option value="">Select a category</option>
+                <option value="employment">Employment & Labor</option>
+                <option value="contracts">Contracts & Agreements</option>
+                <option value="intellectual-property">Intellectual Property</option>
+                <option value="business">Business & Startup</option>
+                <option value="tenant-rights">Tenant Rights</option>
+                <option value="consumer-rights">Consumer Rights</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="button button-primary submit-button">
+                Get Legal Guidance
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Response Area -->
+        <div class="response-container card hidden" id="responseContainer">
+          <div class="response-header">
+            <h3>Legal Guidance</h3>
+            <div class="response-actions">
+              <button class="button button-secondary save-response-button" id="saveResponseButton">
+                💾 Save Response
+              </button>
+            </div>
+          </div>
+          <div class="response-area" id="responseArea">
+            <!-- AI response will be displayed here -->
+          </div>
+        </div>
+
+        <!-- Quick Tips -->
+        <div class="tips-section mt-4">
+          <h3>Tips for Better Answers</h3>
+          <div class="tips-grid grid grid-2">
+            <div class="tip-card">
+              <h4>📝 Be Specific</h4>
+              <p>Include relevant details like dates, amounts, locations, and parties involved.</p>
+            </div>
+            <div class="tip-card">
+              <h4>📍 Mention Your Location</h4>
+              <p>Laws vary by state and country. Include your jurisdiction for more accurate advice.</p>
+            </div>
+            <div class="tip-card">
+              <h4>⚠️ Urgent Matters</h4>
+              <p>For time-sensitive legal issues, consider consulting with a licensed attorney.</p>
+            </div>
+            <div class="tip-card">
+              <h4>🔒 Privacy</h4>
+              <p>Avoid sharing sensitive personal information like SSN, account numbers, or passwords.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <p>&copy; 2025 Legal Help Assistant. All rights reserved. | Providing accessible legal guidance for everyone.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+  <script>
+    // Question form handling
+    document.getElementById('questionForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const questionInput = document.getElementById('questionInput');
+      const categorySelect = document.getElementById('categorySelect');
+      const submitButton = document.querySelector('.submit-button');
+      const responseContainer = document.getElementById('responseContainer');
+      const responseArea = document.getElementById('responseArea');
+      
+      const question = questionInput.value.trim();
+      const category = categorySelect.value;
+      
+      if (!question) {
+        showNotification('Please enter your legal question.', 'error');
+        return;
+      }
+      
+      // Show loading state
+      const originalContent = showLoading(submitButton);
+      
+      // Simulate AI response (replace with actual API call)
+      setTimeout(() => {
+        const mockResponse = generateMockResponse(question, category);
+        
+        // Display response
+        responseArea.innerHTML = mockResponse;
+        responseContainer.classList.remove('hidden');
+        
+        // Hide loading state
+        hideLoading(submitButton, originalContent);
+        
+        // Scroll to response
+        responseContainer.scrollIntoView({ behavior: 'smooth' });
+        
+        showNotification('Legal guidance generated successfully!');
+      }, 2000);
+    });
+    
+    // Save response functionality
+    document.getElementById('saveResponseButton').addEventListener('click', function() {
+      const question = document.getElementById('questionInput').value;
+      const response = document.getElementById('responseArea').innerHTML;
+      
+      // Save to localStorage (in a real app, this would be saved to a database)
+      const savedResponses = JSON.parse(localStorage.getItem('savedResponses') || '[]');
+      const newResponse = {
+        id: Date.now(),
+        question: question,
+        response: response,
+        category: document.getElementById('categorySelect').value,
+        timestamp: new Date().toISOString()
+      };
+      
+      savedResponses.unshift(newResponse);
+      localStorage.setItem('savedResponses', JSON.stringify(savedResponses));
+      
+      showNotification('Response saved successfully!');
+    });
+    
+    // Generate mock AI response
+    function generateMockResponse(question, category) {
+      const responses = {
+        employment: `
+          <div class="legal-response">
+            <h4>Employment Law Guidance</h4>
+            <p><strong>Based on your question:</strong> "${question}"</p>
+            
+            <div class="response-section">
+              <h5>Key Points:</h5>
+              <ul>
+                <li>Employment laws vary by state, but most protect workers from unpaid wages</li>
+                <li>You may be entitled to file a wage claim with your state's labor department</li>
+                <li>Document all work performed and communication with your employer</li>
+                <li>Consider sending a formal demand letter before taking legal action</li>
+              </ul>
+            </div>
+            
+            <div class="response-section">
+              <h5>Recommended Actions:</h5>
+              <ol>
+                <li>Gather all documentation (contracts, emails, work samples)</li>
+                <li>Calculate the exact amount owed including any applicable interest</li>
+                <li>Send a formal written demand for payment</li>
+                <li>If no response, file a complaint with your state labor department</li>
+              </ol>
+            </div>
+            
+            <div class="disclaimer">
+              <p><em>⚠️ This is general legal information and not legal advice. For specific legal advice, consult with a qualified attorney in your jurisdiction.</em></p>
+            </div>
+          </div>
+        `,
+        contracts: `
+          <div class="legal-response">
+            <h4>Contract Law Guidance</h4>
+            <p><strong>Based on your question:</strong> "${question}"</p>
+            
+            <div class="response-section">
+              <h5>Contract Essentials:</h5>
+              <ul>
+                <li>Valid contracts require offer, acceptance, and consideration</li>
+                <li>Written contracts are generally more enforceable than verbal agreements</li>
+                <li>Review all terms carefully before signing</li>
+                <li>Understand termination clauses and dispute resolution procedures</li>
+              </ul>
+            </div>
+            
+            <div class="response-section">
+              <h5>Next Steps:</h5>
+              <ol>
+                <li>Review the contract terms thoroughly</li>
+                <li>Identify any unclear or problematic clauses</li>
+                <li>Consider negotiating unfavorable terms</li>
+                <li>Ensure all parties sign and date the agreement</li>
+              </ol>
+            </div>
+            
+            <div class="disclaimer">
+              <p><em>⚠️ This is general legal information and not legal advice. For specific legal advice, consult with a qualified attorney in your jurisdiction.</em></p>
+            </div>
+          </div>
+        `,
+        default: `
+          <div class="legal-response">
+            <h4>Legal Guidance</h4>
+            <p><strong>Based on your question:</strong> "${question}"</p>
+            
+            <div class="response-section">
+              <h5>General Considerations:</h5>
+              <ul>
+                <li>Legal matters can be complex and fact-specific</li>
+                <li>State and local laws may apply to your situation</li>
+                <li>Documentation is crucial for any legal issue</li>
+                <li>Time limits (statutes of limitations) may apply</li>
+              </ul>
+            </div>
+            
+            <div class="response-section">
+              <h5>Recommended Actions:</h5>
+              <ol>
+                <li>Gather all relevant documents and evidence</li>
+                <li>Research applicable laws in your jurisdiction</li>
+                <li>Consider alternative dispute resolution methods</li>
+                <li>Consult with a qualified attorney if needed</li>
+              </ol>
+            </div>
+            
+            <div class="disclaimer">
+              <p><em>⚠️ This is general legal information and not legal advice. For specific legal advice, consult with a qualified attorney in your jurisdiction.</em></p>
+            </div>
+          </div>
+        `
+      };
+      
+      return responses[category] || responses.default;
+    }
+  </script>
+  
+  <style>
+    .question-page {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .page-header h1 {
+      color: var(--primary-color);
+      margin-bottom: 0.5rem;
+    }
+    
+    .question-form-container {
+      margin-bottom: 2rem;
+    }
+    
+    .form-actions {
+      text-align: center;
+    }
+    
+    .response-container {
+      border-left: 4px solid var(--primary-color);
+    }
+    
+    .response-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .response-area {
+      line-height: 1.7;
+    }
+    
+    .legal-response h4 {
+      color: var(--primary-color);
+      margin-bottom: 1rem;
+    }
+    
+    .legal-response h5 {
+      color: var(--text-primary);
+      margin: 1.5rem 0 0.5rem 0;
+    }
+    
+    .response-section {
+      margin-bottom: 1.5rem;
+    }
+    
+    .response-section ul,
+    .response-section ol {
+      margin-left: 1.5rem;
+    }
+    
+    .response-section li {
+      margin-bottom: 0.5rem;
+    }
+    
+    .disclaimer {
+      background-color: var(--background-light);
+      padding: 1rem;
+      border-radius: var(--border-radius);
+      margin-top: 2rem;
+    }
+    
+    .tips-section h3 {
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+    }
+    
+    .tip-card {
+      background: var(--background-light);
+      padding: 1.5rem;
+      border-radius: var(--border-radius);
+      border-left: 4px solid var(--primary-color);
+    }
+    
+    .tip-card h4 {
+      color: var(--primary-color);
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+    
+    .tip-card p {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+    
+    @media (max-width: 768px) {
+      .response-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+      }
+      
+      .save-response-button {
+        width: 100%;
+      }
+    }
+  </style>
+</body>
+</html>

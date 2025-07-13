@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legal Help Assistant - AI-Powered Legal Help for Students & Freelancers</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-container">
+        <a href="index.html" class="logo">Legal Help Assistant</a>
+        <ul class="nav-menu">
+          <li><a href="index.html" class="nav-link">Home</a></li>
+          <li><a href="ask.html" class="nav-link">Ask a Question</a></li>
+          <li><a href="documents.html" class="nav-link">Documents</a></li>
+          <li><a href="saved.html" class="nav-link">Saved</a></li>
+          <li><a href="login.html" class="nav-link">Login</a></li>
+        </ul>
+        <button class="mobile-menu-toggle">☰</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Hero Section -->
+    <section class="hero-section section">
+      <div class="container">
+        <div class="hero-content text-center">
+          <h1 class="hero-title">AI-Powered Legal Help for Students & Freelancers</h1>
+          <p class="hero-description">
+            Get instant answers to your legal questions, generate professional documents, 
+            and access affordable legal guidance tailored for students and independent professionals.
+          </p>
+          <div class="hero-actions mt-4">
+            <a href="ask.html" class="button button-primary button-large">Ask Your Question</a>
+            <a href="documents.html" class="button button-secondary button-large">Generate Documents</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section section">
+      <div class="container">
+        <h2 class="text-center mb-4">How We Help You</h2>
+        <div class="grid grid-3">
+          <div class="feature-card card">
+            <div class="feature-icon mb-2">⚖️</div>
+            <h3>Legal Q&A</h3>
+            <p>Ask any legal question and get instant, AI-powered answers tailored to your situation. Perfect for quick clarifications and guidance.</p>
+          </div>
+          <div class="feature-card card">
+            <div class="feature-icon mb-2">📄</div>
+            <h3>Document Generation</h3>
+            <p>Create professional legal documents like NDAs, contracts, and agreements with our easy-to-use templates and generators.</p>
+          </div>
+          <div class="feature-card card">
+            <div class="feature-icon mb-2">💾</div>
+            <h3>Save & Organize</h3>
+            <p>Keep track of all your legal questions, answers, and generated documents in one secure, organized place.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section section">
+      <div class="container">
+        <div class="cta-content card text-center">
+          <h2>Ready to Get Legal Help?</h2>
+          <p>Join thousands of students and freelancers who trust Legal Help Assistant for their legal needs.</p>
+          <div class="cta-actions mt-3">
+            <a href="ask.html" class="button button-primary button-large">Start Now - It's Free</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <p>&copy; 2025 Legal Help Assistant. All rights reserved. | Providing accessible legal guidance for everyone.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+  <style>
+    .hero-section {
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      padding: 4rem 0;
+    }
+
+    .hero-title {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-description {
+      font-size: 1.25rem;
+      max-width: 600px;
+      margin: 0 auto 2rem;
+      color: var(--text-secondary);
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .feature-icon {
+      font-size: 3rem;
+      text-align: center;
+    }
+
+    .feature-card {
+      text-align: center;
+      transition: var(--transition);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .cta-section {
+      background-color: var(--background-light);
+    }
+
+    .cta-content {
+      background: var(--white);
+      border: 2px solid var(--primary-color);
+    }
+
+    @media (max-width: 768px) {
+      .hero-title {
+        font-size: 2.5rem;
+      }
+      
+      .hero-description {
+        font-size: 1.1rem;
+      }
+      
+      .hero-actions {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .button-large {
+        width: 100%;
+        max-width: 300px;
+      }
+    }
+  </style>
+</body>
+</html>
